@@ -1,12 +1,6 @@
 pipeline {
     agent any
 
-    environment {
-        // Direct path to Python binary to avoid PATH inheritance
-        // issues on Windows Service agents
-        PYTHON_PATH = 'C:\\Users\\Hp\\AppData\\Local\\Python\\bin\\python.exe'
-    }
-
     stages {
 
         stage('Checkout Source Code') {
@@ -17,31 +11,27 @@ pipeline {
 
         stage('Set Up Environment & Dependencies') {
             steps {
-                bat '''
-                    @echo off
+                sh '''
+                    echo "[1/3] Creating virtual environment..."
+                    rm -rf venv
+                    python3 -m venv venv
 
-                    echo [1/3] Creating virtual environment...
-                    if exist venv rmdir /s /q venv
-                    "%PYTHON_PATH%" -m venv venv
+                    echo "[2/3] Upgrading pip..."
+                    ./venv/bin/python -m pip install --upgrade pip
 
-                    echo [2/3] Upgrading pip...
-                    venv\\Scripts\\python.exe -m pip install --upgrade pip
-
-                    echo [3/3] Installing testing packages...
-                    venv\\Scripts\\python.exe -m pip install pytest selenium webdriver-manager
+                    echo "[3/3] Installing testing packages..."
+                    ./venv/bin/python -m pip install pytest selenium webdriver-manager
                 '''
             }
         }
 
         stage('Execute Selenium Tests') {
             steps {
-                bat '''
-                    @echo off
+                sh '''
+                    mkdir -p reports
 
-                    if not exist reports mkdir reports
-
-                    echo Running Pytest Suite...
-                    venv\\Scripts\\python.exe -m pytest tests/ --junitxml=reports/junit-report.xml
+                    echo "Running Pytest Suite..."
+                    ./venv/bin/python -m pytest tests/ --junitxml=reports/junit-report.xml
                 '''
             }
         }
@@ -49,7 +39,6 @@ pipeline {
 
     post {
         always {
-            // Parses test XML and renders test results in Jenkins
             junit testResults: 'reports/junit-report.xml',
                  allowEmptyResults: true
         }
